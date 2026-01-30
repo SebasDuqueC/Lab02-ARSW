@@ -66,6 +66,31 @@ co.eci.snake
 
 > Objetivo didáctico: practicar suspensión/continuación **sin** espera activa y consolidar el modelo de monitores en Java.
 
+respuestas:
+---
+
+## Observaciones y comentarios
+
+1. Se implementó un objeto lock compartido entre la clase Control y todos los hilos PrimeFinderThread. Este objeto actúa como monitor para coordinar la sincronización entre el hilo principal y los hilos trabajadores. El lock se crea en el constructor de Control y se pasa como parámetro a cada PrimeFinderThread durante su inicialización.
+
+La condición que determina si un hilo debe pausarse es la variable booleana paused. Esta variable se declaró como volatile para garantizar visibilidad entre hilos y evitar que los cambios realizados por un hilo no sean vistos por otros debido a la caché de CPU.
+
+Cada hilo trabajador verifica esta condición en cada iteración del ciclo principal:
+
+![Definición del ciclo de vida de un hilo](img/Parte_1_img_1.png)
+
+Para evitar lost wakeups se implementaron varias estrategias:
+
+Uso de while en lugar de if: La condición paused se evalúa con un while y no con un if. Esto asegura que si un hilo despierta por cualquier razón (spurious wakeup), vuelva a verificar la condición antes de continuar.
+
+Sincronización atómica en resume: El método resumeThreads() usa un bloque synchronized para cambiar el estado de paused a false y hacer notifyAll() de forma atómica:
+
+![Definición del ciclo de vida de un hilo](img/Parte_1_img_1.png)
+
+Uso de notifyAll() en lugar de notify(): Se utiliza notifyAll() para despertar a todos los hilos en espera, no solo a uno. Esto asegura que todos los hilos trabajadores reciban la señal de continuar.
+
+Variable volatile: Aunque el acceso a paused dentro del wait se hace en un bloque sincronizado, declararla como volatile proporciona una capa adicional de seguridad para lecturas fuera del bloque sincronizado.
+
 ---
 
 ## Parte II — SnakeRace concurrente (núcleo del laboratorio)
