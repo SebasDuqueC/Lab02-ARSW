@@ -21,6 +21,9 @@ public final class SnakeApp extends JFrame {
   private final JButton actionButton;
   private final GameClock clock;
   private final java.util.List<Snake> snakes = new java.util.ArrayList<>();
+  
+  private volatile boolean paused = false;
+  private final Object pauseLock = new Object();
 
   public SnakeApp() {
     super("The Snake Race");
@@ -48,7 +51,7 @@ public final class SnakeApp extends JFrame {
     this.clock = new GameClock(60, () -> SwingUtilities.invokeLater(gamePanel::repaint));
 
     var exec = Executors.newVirtualThreadPerTaskExecutor();
-    snakes.forEach(s -> exec.submit(new SnakeRunner(s, board)));
+    snakes.forEach(s -> exec.submit(new SnakeRunner(s, board, () -> paused, pauseLock)));
 
     actionButton.addActionListener((ActionEvent e) -> togglePause());
 
@@ -132,9 +135,14 @@ public final class SnakeApp extends JFrame {
     if ("Action".equals(actionButton.getText())) {
       actionButton.setText("Resume");
       clock.pause();
+      paused = true;
     } else {
       actionButton.setText("Action");
       clock.resume();
+      paused = false;
+      synchronized (pauseLock) {
+        pauseLock.notifyAll();
+      }
     }
   }
 

@@ -150,9 +150,53 @@ El culpable del problema anterior es una lista que usan:
 
 ### 2) Correcciones mínimas y regiones críticas
 
-- **Elimina** esperas activas reemplazándolas por **señales** / **estados** o mecanismos de la librería de concurrencia.
-- Protege **solo** las **regiones críticas estrictamente necesarias** (evita bloqueos amplios).
-- Justifica en **`el reporte de laboratorio`** cada cambio: cuál era el riesgo y cómo lo resuelves.
+### A. Arreglando la Clase `Snake` (Protegiendo el cuerpo)
+*   **¿Qué hicimos?** Le metimos `synchronized` a los métodos importantes: `head()`, `snapshot()`, y `advance()`.
+*   **Justificación:** El riesgo era que si la serpiente se movía (`advance`) justo cuando la pantalla la estaba dibujando (`snapshot`), el programa se rompía o mostraba basura. Con `synchronized`, obligamos a que si uno está tocando la lista del cuerpo, el otro tiene que esperar a que termine. Es como ponerle seguro a la puerta del baño.
+
+```java
+// Archivo: Snake.java
+public synchronized Position head() { return body.peekFirst(); }
+public synchronized Deque<Position> snapshot() { return new ArrayDeque<>(body); }
+public synchronized void advance(Position newHead, boolean grow) { ... }
+```
+
+### B. Eliminando la espera activa (La pausa real)
+*   **¿Qué hicimos?**
+    1.  Creamos un objeto candado (`pauseLock`).
+    2.  En `SnakeRunner`, antes de moverse, ahora pregunta `checkPause()`.
+    3.  Si está pausado, entra en un `wait()` (se duerme de verdad).
+    4.  Cuando reanudamos (`notifyAll`), se despierta instantáneamente.
+*   **Justificación:** Antes, si pausabas, las serpientes seguían corriendo en secreto, gastando batería y procesador a lo loco (espera activa). Ahora, cuando pausas, el hilo realmente se detiene y no consume recursos hasta que le avisen.
+
+```java
+// Archivo: SnakeRunner.java
+private void checkPause() throws InterruptedException {
+  if (isPaused.get()) {
+    synchronized (pauseLock) {
+      while (isPaused.get()) {
+        pauseLock.wait();
+      }
+    }
+  }
+}
+```
+
+### C. Mejorando el tablero (`Board`)
+*   **¿Qué hicimos?** Cambiamos los `HashSet` (que son inseguros) por `ConcurrentHashMap.newKeySet()`. Y lo más importante: le quitamos el `synchronized` a los métodos que solo leen datos (como `mice()` o `obstacles()`).
+*   **Justificación:**
+    *   **Riesgo:** Tener todo `synchronized` era un cuello de botella. Si había 50 serpientes, 49 tenían que esperar para ver dónde había un ratón.
+    *   **Solución:** Al usar colecciones concurrentes, muchas serpientes pueden leer el mapa al mismo tiempo sin chocarse y sin hacer fila. Solo protegimos el movimiento (`step`) porque ahí sí hay peligro de que dos coman lo mismo.
+    
+```java
+// Archivo: Board.java
+// Antes: private final Set<Position> mice = new HashSet<>();
+private final Set<Position> mice = ConcurrentHashMap.newKeySet();
+
+// Ya NO son synchronized para que varios puedan leer al tiempo
+public Set<Position> mice() { return new HashSet<>(mice); }
+```
+
 
 ### 3) Control de ejecución seguro (UI)
 

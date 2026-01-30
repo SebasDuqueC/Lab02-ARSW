@@ -5,6 +5,7 @@ import co.eci.snake.core.Direction;
 import co.eci.snake.core.Snake;
 
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Supplier;
 
 public final class SnakeRunner implements Runnable {
   private final Snake snake;
@@ -12,16 +13,22 @@ public final class SnakeRunner implements Runnable {
   private final int baseSleepMs = 80;
   private final int turboSleepMs = 40;
   private int turboTicks = 0;
+  
+  private final Supplier<Boolean> isPaused;
+  private final Object pauseLock;
 
-  public SnakeRunner(Snake snake, Board board) {
+  public SnakeRunner(Snake snake, Board board, Supplier<Boolean> isPaused, Object pauseLock) {
     this.snake = snake;
     this.board = board;
+    this.isPaused = isPaused;
+    this.pauseLock = pauseLock;
   }
 
   @Override
   public void run() {
     try {
       while (!Thread.currentThread().isInterrupted()) {
+        checkPause();
         maybeTurn();
         var res = board.step(snake);
         if (res == Board.MoveResult.HIT_OBSTACLE) {
@@ -35,6 +42,16 @@ public final class SnakeRunner implements Runnable {
       }
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
+    }
+  }
+
+  private void checkPause() throws InterruptedException {
+    if (isPaused.get()) {
+      synchronized (pauseLock) {
+        while (isPaused.get()) {
+          pauseLock.wait();
+        }
+      }
     }
   }
 
