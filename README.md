@@ -97,11 +97,56 @@ Variable volatile: Aunque el acceso a paused dentro del wait se hace en un bloqu
 
 ### 1) Análisis de concurrencia
 
-- Explica **cómo** el código usa hilos para dar autonomía a cada serpiente.
-- **Identifica** y documenta en **`el reporte de laboratorio`**:
-  - Posibles **condiciones de carrera**.
-  - **Colecciones** o estructuras **no seguras** en contexto concurrente.
-  - Ocurrencias de **espera activa** (busy-wait) o de sincronización innecesaria.
+## 1. ¿Cómo funcionan las serpientes por su cuenta?
+
+Al revisar el código, nos dimos cuenta de que cada serpiente se mueve sola porque tiene su propio "cerebro" (hilo). Esto no lo maneja la pantalla principal, sino que cada una va por su lado.
+
+En el archivo `SnakeApp.java`, vimos esto:
+
+1.  **El jefe de los hilos:** Usan una cosa llamada `newVirtualThreadPerTaskExecutor`. Es algo nuevo de Java 21 que crea hilos súper ligeros y rápidos.
+2.  **Repartiendo trabajo:** Por cada serpiente que hay en el juego, crean un `SnakeRunner` y lo ponen a correr en uno de esos hilos.
+    ```java
+    // En SnakeApp.java
+    var exec = Executors.newVirtualThreadPerTaskExecutor();
+    snakes.forEach(s -> exec.submit(new SnakeRunner(s, board)));
+    ```
+3.  **Vida propia:** Cada `SnakeRunner` tiene un ciclo infinito (`while`) donde decide si gira, se mueve un paso y luego descansa un ratico (`Thread.sleep`). Así es como cada una cobra vida independientemente.
+
+**En resumen:** Cada culebrita tiene su propio hilo pensando y moviéndose, sin importarle lo que hagan las demás o si la pantalla se está dibujando.
+
+## 2. Problemas que encontramos
+
+Mirando bien el código, vimos algunas cosas que pueden hacer que el juego falle o se comporte raro cuando hay muchas serpientes moviéndose a la vez.
+
+### A. Condiciones de Carrera (El choque de trenes)
+
+Hay un problema  en la clase `Snake`.
+
+*   **¿Qué pasa?** Está la clase `Snake` que dos partes del programa intentan usar al tiempo.
+    *   Uno es el hilo de la serpiente (`SnakeRunner`), que todo el tiempo le dice "crece", "muévete" (modifica la lista del cuerpo).
+    *   El otro es la pantalla (`GamePanel`), que todo el tiempo pregunta "¿dónde estás?" para dibujarla.
+*   **El problema:** Si la pantalla intenta leer la posición de la serpiente justo en el milisegundo en que la serpiente se está moviendo (borrando la cola o poniendo cabeza nueva), se va a encontrar con datos a medias o corruptos. Eso puede hacer que el juego rompa o se vea raro.
+
+### B. Listas
+
+El culpable del problema anterior es una lista que usan:
+
+*   **La lista:** `java.util.ArrayDeque` en el cuerpo de la serpiente.
+*   **Por qué falla:** Esa lista no está hecha para que varios hilos la toquen a la vez. Como no tiene "candado" ni nada de seguridad, si dos hilos entran al tiempo, se rompe (lanza una `ConcurrentModificationException`). Es como tratar de arreglar un motor con el carro andando.
+
+### C. Bloqueos exagerados y pausas de mentiras
+
+1.  **El mapa es un cuello de botella:**
+    *   En la clase `Board` (el tablero), vimos que le pusieron `synchronized` a todo.
+    *   Aunque eso evita errores, es como si en una autopista de 5 carriles obligaran a todos a pasar por una sola caseta de peaje. Si hay muchas serpientes, se van a quedar esperando su turno para moverse, y el juego se va a poner lento no por gráficos, sino por hacer fila.
+
+2.  **La Pausa no pausa nada:**
+    *   Cuando le das al botón de "Pausa", la pantalla deja de actualizarse, pero las serpientes siguen corriendo por debajo.
+    *   Los hilos de las serpientes no tienen ni idea de que el juego está pausado, así que siguen calculando y moviéndose "a ciegas". Eso está mal porque gasta procesador sin necesidad y cuando reanudas, las serpientes ya están en otro lado.
+
+3.  **Buscando sitio sin un sentido:**
+    *   Cuando el juego busca dónde poner un ratón nuevo (`Board.randomEmpty`), lo hace probando al azar una y otra vez hasta que le pega a un sitio vacío.
+    *   Si el tablero está casi lleno, se puede quedar ahí un buen rato probando y fallando, gastando CPU inútilmente (espera activa).
 
 ### 2) Correcciones mínimas y regiones críticas
 
@@ -173,3 +218,10 @@ Incluye compilación y ejecución de pruebas JUnit. Si tienes análisis estátic
 Este laboratorio es una adaptación modernizada del ejercicio **SnakeRace** de ARSW. El enunciado de actividades se conserva para mantener los objetivos pedagógicos del curso.
 
 **Base construida por el Ing. Javier Toquica.**
+
+---
+
+
+
+
+
