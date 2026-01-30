@@ -200,11 +200,45 @@ public Set<Position> mice() { return new HashSet<>(mice); }
 
 ### 3) Control de ejecución seguro (UI)
 
-- Implementa la **UI** con **Iniciar / Pausar / Reanudar** (ya existe el botón _Action_ y el reloj `GameClock`).
-- Al **Pausar**, muestra de forma **consistente** (sin _tearing_):
-  - La **serpiente viva más larga**.
-  - La **peor serpiente** (la que **primero murió**).
-- Considera que la suspensión **no es instantánea**; coordina para que el estado mostrado no quede “a medias”.
+## Botón de Pausa y Estadísticas
+
+Además de arreglar la pausa para que los hilos no trabajen de más, nos pidieron que la interfaz mostrara datos útiles al pausar.
+
+### A. Estadísticas al pausar
+*   **¿Qué hicimos?** Modificamos el método `togglePause` en `SnakeApp`. Ahora, cuando pausas, calcula en ese instante cuál es la serpiente más larga y muestra una ventanita (`JOptionPane`) con la info.
+*   **Justificación:** Esto demuestra que podemos leer el estado de las serpientes (longitud) de forma segura incluso cuando están detenidas, gracias a los arreglos de sincronización que hicimos antes.
+
+```java
+// En SnakeApp.java
+private void showStatistics() {
+    Snake longest = null;
+    for (Snake s : snakes) {
+        if (longest == null || s.length() > longest.length()) { // .length() es thread-safe
+            longest = s;
+        }
+    }
+    JOptionPane.showMessageDialog(this, "Serpiente más larga: " + longest.length());
+}
+```
+
+### B. Muerte de serpientes
+*   **¿Qué hicimos?** Antes, si una serpiente chocaba, solo daba una vuelta al azar (`randomTurn`). Modificamos `SnakeRunner` para que si `board.step()` devuelve `HIT_OBSTACLE`, la serpiente marque su estado como muerta (`kill()`) y el hilo termine (rompe el `while`).
+*   **Justificación:** Para que el juego tenga sentido y fin, las serpientes deben poder morir. Esto también libera recursos porque el hilo virtual deja de existir.
+
+```java
+// En Snake.java
+private volatile boolean alive = true;
+public boolean isAlive() { return alive; }
+public void kill() { this.alive = false; }
+
+// En SnakeRunner.java
+while (!Thread.currentThread().isInterrupted() && snake.isAlive()) { // Chequea vida
+    // ...
+    if (res == Board.MoveResult.HIT_OBSTACLE) {
+        snake.kill(); // Muere y sale del bucle
+    }
+}
+```
 
 ### 4) Robustez bajo carga
 

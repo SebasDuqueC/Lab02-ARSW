@@ -136,6 +136,7 @@ public final class SnakeApp extends JFrame {
       actionButton.setText("Resume");
       clock.pause();
       paused = true;
+      showStatistics();
     } else {
       actionButton.setText("Action");
       clock.resume();
@@ -144,6 +145,37 @@ public final class SnakeApp extends JFrame {
         pauseLock.notifyAll();
       }
     }
+  }
+
+  private void showStatistics() {
+      Snake longest = null;
+      Snake firstDead = null;
+
+      for (Snake s : snakes) {
+          // Calcular la más larga (viva o muerta, cuenta su longitud final)
+          if (longest == null || s.length() > longest.length()) {
+              longest = s;
+          }
+          
+          // Calcular la primera que murió
+          if (!s.isAlive()) {
+              if (firstDead == null || s.getDeathTime() < firstDead.getDeathTime()) {
+                  firstDead = s;
+              }
+          }
+      }
+      
+      String msg = "Juego Pausado\n\n";
+      if (longest != null) {
+          msg += "Serpiente más larga: " + longest.length() + " bloques\n";
+      }
+      if (firstDead != null) {
+          msg += "Peor serpiente (primera en morir): Murió con longitud " + firstDead.length() + "\n";
+      } else {
+          msg += "Peor serpiente: Ninguna ha muerto aún\n";
+      }
+      
+      JOptionPane.showMessageDialog(this, msg);
   }
 
   public static final class GamePanel extends JPanel {
