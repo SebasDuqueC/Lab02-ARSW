@@ -34,7 +34,9 @@ public final class SnakeApp extends JFrame {
       int x = 2 + (i * 3) % board.width();
       int y = 2 + (i * 2) % board.height();
       var dir = Direction.values()[i % Direction.values().length];
-      snakes.add(Snake.of(x, y, dir));
+      var s = Snake.of(x, y, dir);
+      snakes.add(s);
+      board.registerSnake(s);
     }
 
     this.gamePanel = new GamePanel(board, () -> snakes);
@@ -250,10 +252,10 @@ public final class SnakeApp extends JFrame {
       }
 
       // Serpientes
-      var snakes = snakesSupplier.get();
+      List<Snake> snakes = snakesSupplier.get();
       int idx = 0;
       for (Snake s : snakes) {
-        var body = s.snapshot().toArray(new Position[0]);
+        var body = (Position[]) s.snapshot().toArray(Position[]::new);
         for (int i = 0; i < body.length; i++) {
           var p = body[i];
           Color base = (idx == 0) ? new Color(0, 170, 0) : new Color(0, 160, 180);

@@ -33,6 +33,7 @@ public final class SnakeRunner implements Runnable {
         var res = board.step(snake);
         if (res == Board.MoveResult.HIT_OBSTACLE) {
           snake.kill(); // Muere al chocar
+          break;
         } else if (res == Board.MoveResult.ATE_TURBO) {
           turboTicks = 100;
         }
@@ -42,6 +43,8 @@ public final class SnakeRunner implements Runnable {
       }
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
+    } finally {
+      board.unregisterSnake(snake);
     }
   }
 
@@ -61,7 +64,7 @@ public final class SnakeRunner implements Runnable {
   }
 
   private void randomTurn() {
-    var dirs = Direction.values();
+    Direction[] dirs = Direction.values();
     snake.turn(dirs[ThreadLocalRandom.current().nextInt(dirs.length)]);
   }
 }
