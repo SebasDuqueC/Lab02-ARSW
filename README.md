@@ -17,7 +17,7 @@ La condición que determina si un hilo debe pausarse es la variable booleana pau
 
 Cada hilo trabajador verifica esta condición en cada iteración del ciclo principal:
 
-![Definición del ciclo de vida de un hilo](img/Parte_1_img_1.png)
+![](img/img1.png)
 
 Para evitar lost wakeups se implementaron varias estrategias:
 
@@ -25,7 +25,7 @@ Uso de while en lugar de if: La condición paused se evalúa con un while y no c
 
 Sincronización atómica en resume: El método resumeThreads() usa un bloque synchronized para cambiar el estado de paused a false y hacer notifyAll() de forma atómica:
 
-![Definición del ciclo de vida de un hilo](img/Parte_1_img_1.png)
+![](img/sincronizacion_atomica-p1.png)
 
 Uso de notifyAll() en lugar de notify(): Se utiliza notifyAll() para despertar a todos los hilos en espera, no solo a uno. Esto asegura que todos los hilos trabajadores reciban la señal de continuar.
 
